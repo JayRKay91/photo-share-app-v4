@@ -2,8 +2,9 @@ from app import create_app, db
 
 app = create_app()
 
-# --- Always try creating missing tables (safe, idempotent) ---
+# --- Make sure context exists before accessing db ---
 with app.app_context():
+    from app.models import User, SharedAccess, Photo, Comment  # <-- Add your models here
     db.create_all()
     print("✅ Database checked/created successfully.")
 
