@@ -1,18 +1,21 @@
-# Ignore Python cache
+# Byte-compiled / temporary files
 __pycache__/
 *.py[cod]
+*.pyo
 
 # Virtual environment
 venv/
 
-# Local data not needed in Git
-app/descriptions.json
+# Environment variables / secrets
+.env
 
-# VS Code settings (optional)
-.vscode/
+# Uploaded content (photos, videos)
+uploads/
 
-# Mac system files (optional)
+# SQLite database (optional — depends if you want to track it)
+*.sqlite3
+app.db
+
+# OS-specific files
 .DS_Store
-
-# Album info not needed in Git
-app/albums.json
+Thumbs.db

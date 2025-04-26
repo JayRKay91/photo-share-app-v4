@@ -9,12 +9,12 @@ import os
 
 auth = Blueprint("auth", __name__, template_folder="templates")
 
+# Serializer for generating tokens
+s = URLSafeTimedSerializer(os.getenv("SECRET_KEY", "dev_key"))
+
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
-
-# Serializer for generating tokens
-s = URLSafeTimedSerializer(os.getenv("SECRET_KEY", "dev_key"))
 
 # ---------- Register ----------
 @auth.route("/register", methods=["GET", "POST"])
@@ -26,7 +26,7 @@ def register():
 
         existing_user = User.query.filter((User.username == username) | (User.email == email)).first()
         if existing_user:
-            flash("Username or email already exists.")
+            flash("Username or email already exists.", "error")
             return redirect(url_for("auth.register"))
 
         new_user = User(
@@ -45,7 +45,7 @@ def register():
         msg.body = f"Click the link to verify your account: {link}"
         mail.send(msg)
 
-        flash("A verification email has been sent. Please check your inbox.")
+        flash("A verification email has been sent. Please check your inbox.", "success")
         return redirect(url_for("auth.login"))
 
     return render_template("auth/register.html")
@@ -59,10 +59,11 @@ def verify_email(token):
         if user:
             user.is_verified = True
             db.session.commit()
-            flash("Email verified. You can now log in.")
+            flash("Email verified. You can now log in.", "success")
             return redirect(url_for("auth.login"))
     except Exception:
-        flash("The confirmation link is invalid or has expired.")
+        flash("The confirmation link is invalid or has expired.", "error")
+
     return redirect(url_for("auth.login"))
 
 # ---------- Login ----------
@@ -74,15 +75,16 @@ def login():
 
         user = User.query.filter_by(email=email).first()
         if not user or not check_password_hash(user.password_hash, password):
-            flash("Invalid email or password.")
+            flash("Invalid email or password.", "error")
             return redirect(url_for("auth.login"))
 
         if not user.is_verified:
-            flash("Please verify your email before logging in.")
+            flash("Please verify your email before logging in.", "warning")
             return redirect(url_for("auth.login"))
 
         login_user(user)
-        return redirect(url_for("main.dashboard"))
+        flash("Login successful!", "success")
+        return redirect(url_for("main.index"))
 
     return render_template("auth/login.html")
 
@@ -91,6 +93,7 @@ def login():
 @login_required
 def logout():
     logout_user()
+    flash("You have been logged out.", "info")
     return redirect(url_for("auth.login"))
 
 # ---------- Password Reset Request ----------
@@ -106,9 +109,9 @@ def reset_request():
             msg = Message("Reset Your Password", recipients=[email])
             msg.body = f"Click to reset your password: {link}"
             mail.send(msg)
-            flash("Password reset email sent.")
+            flash("Password reset email sent.", "success")
         else:
-            flash("No account with that email.")
+            flash("No account with that email.", "error")
 
         return redirect(url_for("auth.login"))
 
@@ -120,7 +123,7 @@ def reset_token(token):
     try:
         email = s.loads(token, salt="password-reset", max_age=3600)
     except Exception:
-        flash("Reset link is invalid or has expired.")
+        flash("Reset link is invalid or has expired.", "error")
         return redirect(url_for("auth.reset_request"))
 
     user = User.query.filter_by(email=email).first()
@@ -128,7 +131,7 @@ def reset_token(token):
         new_password = request.form.get("password")
         user.password_hash = generate_password_hash(new_password)
         db.session.commit()
-        flash("Your password has been updated.")
+        flash("Your password has been updated.", "success")
         return redirect(url_for("auth.login"))
 
     return render_template("auth/reset_password.html")
