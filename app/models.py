@@ -1,8 +1,6 @@
-from flask_sqlalchemy import SQLAlchemy
+from app import db
 from flask_login import UserMixin
 from datetime import datetime
-
-db = SQLAlchemy()
 
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
@@ -16,7 +14,7 @@ class User(db.Model, UserMixin):
 
 class SharedAccess(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    access_name = db.Column(db.String(80), nullable=False)  # e.g. “Mom”
+    access_name = db.Column(db.String(80), nullable=False)  # e.g. "Mom"
     email = db.Column(db.String(120), nullable=False)
     primary_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     can_upload = db.Column(db.Boolean, default=True)
@@ -32,6 +30,6 @@ class Photo(db.Model):
 class Comment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     photo_id = db.Column(db.Integer, db.ForeignKey('photo.id'), nullable=False)
-    author_name = db.Column(db.String(80), nullable=False)  # e.g. “Mom”
+    author_name = db.Column(db.String(80), nullable=False)  # e.g. "Mom"
     text = db.Column(db.Text, nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
