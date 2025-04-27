@@ -13,7 +13,7 @@
       <h1>Photo Gallery</h1>
       <button class="btn btn-primary"
               onclick="location.href='{{ url_for('main.upload') }}'">
-        ➕ Upload New Photo
+        ➕ Upload New Photo
       </button>
     </header>
 
@@ -46,10 +46,10 @@
           {% if img.type == 'video' %}
             <div class="media-wrapper">
               <img
-                src="{{ url_for('static', filename=img.thumb) }}"
+                src="{{ url_for('main.thumbnail', filename=(img.thumb|split('/'))[-1]) }}"
                 alt="Thumbnail for {{ img.filename }}"
                 class="clickable"
-                data-full="{{ url_for('static', filename='uploads/' + img.filename) }}"
+                data-full="{{ url_for('main.uploaded_file', filename=img.filename) }}"
                 data-type="video"
                 onerror="handleError(this)"
               >
@@ -57,10 +57,10 @@
             </div>
           {% else %}
             <img
-              src="{{ url_for('static', filename='uploads/' + img.filename) }}"
+              src="{{ url_for('main.uploaded_file', filename=img.filename) }}"
               alt="{{ img.description or img.filename }}"
               class="clickable"
-              data-full="{{ url_for('static', filename='uploads/' + img.filename) }}"
+              data-full="{{ url_for('main.uploaded_file', filename=img.filename) }}"
               data-type="image"
               onerror="handleError(this)"
             >
@@ -83,7 +83,7 @@
             <div class="tags">
               {% for tag in img.tags %}
                 <span class="tag-label">
-                  <a href="{{ url_for('main.index', tag=tag|lower) }}">📌 {{ tag }}</a>
+                  <a href="{{ url_for('main.index', tag=tag|lower) }}">📌 {{ tag }}</a>
                   <button type="button"
                           onclick="submitForm('remove-{{ img.filename }}-{{ tag }}')"
                           aria-label="Remove tag {{ tag }}"
@@ -117,12 +117,12 @@
               <a href="{{ url_for('main.download_image', filename=img.filename) }}"
                  class="btn btn-secondary"
                  aria-label="Download {{ img.filename }}">
-                ⬇️ Download
+                ⬇️ Download
               </a>
               <form action="{{ url_for('main.delete_image', filename=img.filename) }}"
                     method="post" onsubmit="return confirm('Delete {{ img.filename }}?');"
                     class="inline-form">
-                <button type="submit" class="btn btn-danger">🗑️ Delete</button>
+                <button type="submit" class="btn btn-danger">🗑️ Delete</button>
               </form>
             </div>
           </div>

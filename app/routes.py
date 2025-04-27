@@ -123,7 +123,11 @@ def index():
             continue
 
         media_type = "video" if ext in VIDEO_EXTENSIONS else "image"
-        thumb = f"thumbnails/{path.stem}.jpg" if media_type == "video" else None
+        # Use our new routes for both thumbnails and images
+        if media_type == "video":
+            thumb = url_for('main.thumbnail', filename=f"{path.stem}.jpg")
+        else:
+            thumb = url_for('main.uploaded_file', filename=fn)
 
         images.append({
             "filename": fn,
@@ -392,3 +396,20 @@ def share():
     db.session.commit()
     flash(f"Granted gallery access to {user.username}", 'success')
     return redirect(url_for('main.index'))
+
+
+@main.route("/uploads/<filename>")
+@login_required
+def uploaded_file(filename):
+    """Serve user's uploaded file securely."""
+    fn = sanitize_filename(filename)
+    user_dir = user_folder(current_user.id)
+    return send_from_directory(str(user_dir), fn)
+
+
+@main.route("/thumbnails/<filename>")
+@login_required
+def thumbnail(filename):
+    """Serve thumbnail securely."""
+    fn = sanitize_filename(filename)
+    return send_from_directory(str(THUMB_FOLDER), fn)
