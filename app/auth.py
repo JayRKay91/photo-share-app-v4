@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, current_app
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import login_user, login_required, logout_user, current_user
 from itsdangerous import URLSafeTimedSerializer
@@ -6,6 +6,7 @@ from flask_mail import Message
 from .models import db, User
 from . import login_manager, mail
 import os
+from pathlib import Path
 
 auth = Blueprint("auth", __name__, template_folder="templates")
 
@@ -15,6 +16,12 @@ s = URLSafeTimedSerializer(os.getenv("SECRET_KEY", "dev_key"))
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
+
+def create_user_folder(user_id):
+    """Create a personal uploads folder for the user if it doesn't exist."""
+    upload_base = Path(current_app.config["UPLOAD_FOLDER"]).parent.parent.parent / "uploads"
+    user_folder = upload_base / str(user_id)
+    user_folder.mkdir(parents=True, exist_ok=True)
 
 # ---------- Register ----------
 @auth.route("/register", methods=["GET", "POST"])
@@ -33,13 +40,22 @@ def register():
             username=username,
             email=email,
             password_hash=generate_password_hash(password),
-            is_verified=True  # 🔥 Automatically verified during development!
+            is_verified=False  # Require email verification
         )
         db.session.add(new_user)
         db.session.commit()
 
-        # (Optional: skip sending verification email during development)
-        flash("Registration successful! You can now log in.", "success")
+        # Create personal upload folder after user is added
+        create_user_folder(new_user.id)
+
+        # Send verification email
+        token = s.dumps(email, salt="email-confirm")
+        link = url_for("auth.verify_email", token=token, _external=True)
+        msg = Message("Confirm Your Email", recipients=[email])
+        msg.body = f"Click the link to verify your account: {link}"
+        mail.send(msg)
+
+        flash("A verification email has been sent. Please check your inbox.", "success")
         return redirect(url_for("auth.login"))
 
     return render_template("auth/register.html")
