@@ -33,19 +33,13 @@ def register():
             username=username,
             email=email,
             password_hash=generate_password_hash(password),
-            is_verified=False
+            is_verified=True  # 🔥 Automatically verified during development!
         )
         db.session.add(new_user)
         db.session.commit()
 
-        # Send verification email
-        token = s.dumps(email, salt="email-confirm")
-        link = url_for("auth.verify_email", token=token, _external=True)
-        msg = Message("Confirm Your Email", recipients=[email])
-        msg.body = f"Click the link to verify your account: {link}"
-        mail.send(msg)
-
-        flash("A verification email has been sent. Please check your inbox.", "success")
+        # (Optional: skip sending verification email during development)
+        flash("Registration successful! You can now log in.", "success")
         return redirect(url_for("auth.login"))
 
     return render_template("auth/register.html")
