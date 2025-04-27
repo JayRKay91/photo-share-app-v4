@@ -40,7 +40,7 @@ def register():
             username=username,
             email=email,
             password_hash=generate_password_hash(password),
-            is_verified=False  # Require email verification
+            is_verified=True  # ✅ Automatically verify user for now
         )
         db.session.add(new_user)
         db.session.commit()
