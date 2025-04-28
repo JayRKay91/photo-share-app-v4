@@ -2,12 +2,12 @@ from app import create_app, db
 
 app = create_app()
 
-# --- Make sure context exists before accessing db ---
+# --- Ensure application context before accessing the database ---
 with app.app_context():
-    from app.models import User, SharedAccess, Photo, Comment  # <-- Add your models here
+    from app.models import User, SharedAccess, Photo, Comment  # <-- your models
     db.create_all()
     print("✅ Database checked/created successfully.")
 
-# --- Local run if needed ---
 if __name__ == "__main__":
-    app.run()
+    # Match v3 behavior (host="0.0.0.0", debug=True) while preserving v4 setup
+    app.run(host="0.0.0.0", debug=True)

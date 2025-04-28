@@ -2,7 +2,10 @@ import os
 import json
 import uuid
 from pathlib import Path
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, send_from_directory, abort
+from flask import (
+    Blueprint, render_template, request, redirect,
+    url_for, flash, current_app, send_from_directory, abort
+)
 from werkzeug.utils import secure_filename
 from PIL import Image
 import pillow_heif
@@ -14,10 +17,8 @@ main = Blueprint("main", __name__)
 
 # —— Configuration Constants —— #
 BASE_DIR = Path(__file__).parent.parent
-# Base uploads directory
-UPLOAD_BASE = BASE_DIR / 'uploads'
-# JSON metadata files directory
-DATA_DIR = BASE_DIR
+UPLOAD_BASE     = BASE_DIR / 'uploads'
+DATA_DIR        = BASE_DIR
 DESCRIPTION_PATH = DATA_DIR / "descriptions.json"
 ALBUM_PATH       = DATA_DIR / "albums.json"
 COMMENTS_PATH    = DATA_DIR / "comments.json"
@@ -87,17 +88,14 @@ def user_folder(user_id: int) -> Path:
 @login_required
 def index():
     """Gallery view: shows only current user's media."""
-    # Load metadata
     descs    = load_json(DESCRIPTION_PATH)
     albums   = load_json(ALBUM_PATH)
     comments = load_json(COMMENTS_PATH)
     tags     = load_json(TAGS_PATH)
 
-    # Filter/search params
     tag_filter   = request.args.get("tag", "").strip().lower()
     search_query = request.args.get("search", "").strip().lower()
 
-    # List files in user's folder
     UPLOAD_FOLDER = user_folder(current_user.id)
     media_files = sorted(
         [f for f in UPLOAD_FOLDER.iterdir() if f.is_file()],
@@ -115,19 +113,19 @@ def index():
         if tag_filter and tag_filter not in lt:
             continue
         if search_query and not (
-            search_query in fn.lower() or
-            search_query in descs.get(fn, "").lower() or
-            search_query in albums.get(fn, "").lower() or
-            any(search_query in t.lower() for t in file_tags)
+            search_query in fn.lower()
+            or search_query in descs.get(fn, "").lower()
+            or search_query in albums.get(fn, "").lower()
+            or any(search_query in t.lower() for t in file_tags)
         ):
             continue
 
         media_type = "video" if ext in VIDEO_EXTENSIONS else "image"
-        # Use our new routes for both thumbnails and images
-        if media_type == "video":
-            thumb = url_for('main.thumbnail', filename=f"{path.stem}.jpg")
-        else:
-            thumb = url_for('main.uploaded_file', filename=fn)
+        thumb = (
+            url_for('main.thumbnail', filename=f"{path.stem}.jpg")
+            if media_type == "video"
+            else url_for('main.uploaded_file', filename=fn)
+        )
 
         images.append({
             "filename": fn,
@@ -156,8 +154,22 @@ def index():
 @main.route("/upload", methods=["GET", "POST"])
 @login_required
 def upload():
-    """Upload handler: per-user storage, HEIC conversion, thumbnails."""
+    """Upload handler: shared or owner uploads with alias tracking."""
     if request.method == "POST":
+        # Determine target owner
+        owner_id = int(request.form.get("owner_id", current_user.id))
+        # Permission check & alias
+        if owner_id != current_user.id:
+            access = SharedAccess.query.filter_by(
+                owner_id=owner_id,
+                shared_user_id=current_user.id
+            ).first()
+            if not access or not access.can_upload:
+                abort(403)
+            uploader_alias = access.alias
+        else:
+            uploader_alias = current_user.username
+
         files = request.files.getlist("photos")
         album = request.form.get("album", "").strip()
 
@@ -166,7 +178,7 @@ def upload():
         comments = load_json(COMMENTS_PATH)
         tags     = load_json(TAGS_PATH)
 
-        UPLOAD_FOLDER = user_folder(current_user.id)
+        UPLOAD_FOLDER = user_folder(owner_id)
 
         for file in files:
             if file and allowed_file(file.filename):
@@ -198,12 +210,15 @@ def upload():
                     except Exception as e:
                         flash(f"Thumbnail failed for {filename}: {e}", 'error')
 
-                # Initialize metadata keys
+                # Metadata keys
                 if album:
                     albums[filename] = album
                 descs.setdefault(filename, "")
                 comments.setdefault(filename, [])
                 tags.setdefault(filename, [])
+
+                # Mark upload in comments
+                comments[filename].insert(0, f"Uploaded by {uploader_alias}")
 
         save_json(DESCRIPTION_PATH, descs)
         save_json(ALBUM_PATH, albums)
@@ -351,22 +366,30 @@ def update_description(filename):
 @login_required
 def add_comment(filename):
     fn = sanitize_filename(filename)
-    comments = load_json(COMMENTS_PATH)
-    c = request.form.get("comment", "").strip()
-    if c:
-        # Determine owner and alias
-        owner_id = current_user.id
-        UPLOAD_FOLDER_OWN = user_folder(current_user.id)
-        # Extract filename owner from path: we restrict comments only on own files
-        # Alias logic: only owner comments under own name
-        commenter = current_user.username
-        # Append with commenter prefix
-        comment_str = f"{commenter} - {c}"
-        comments.setdefault(fn, []).append(comment_str)
-        save_json(COMMENTS_PATH, comments)
-        flash("Comment added.", 'success')
-    else:
+    comment_text = request.form.get("comment", "").strip()
+    if not comment_text:
         flash("Empty comment not added.", 'warning')
+        return redirect(url_for('main.index'))
+
+    # Determine target owner
+    owner_id = int(request.form.get("owner_id", current_user.id))
+    if owner_id != current_user.id:
+        access = SharedAccess.query.filter_by(
+            owner_id=owner_id,
+            shared_user_id=current_user.id
+        ).first()
+        if not access or not access.can_comment:
+            abort(403)
+        commenter_alias = access.alias
+    else:
+        commenter_alias = current_user.username
+
+    comments = load_json(COMMENTS_PATH)
+    comments.setdefault(fn, [])
+    comments[fn].append(f"{commenter_alias} — {comment_text}")
+    save_json(COMMENTS_PATH, comments)
+
+    flash("Comment added.", 'success')
     return redirect(url_for('main.index'))
 
 
@@ -375,25 +398,31 @@ def add_comment(filename):
 def share():
     primary_id = current_user.id
     shared_username = request.form.get("username")
-    alias = request.form.get("alias", "").strip()
+    alias = request.form.get("alias", "").strip() or None
+
     user = User.query.filter_by(username=shared_username).first()
     if not user:
         flash('User not found', 'error')
         return redirect(url_for('main.index'))
+
     existing = SharedAccess.query.filter_by(
-        primary_user_id=primary_id,
+        owner_id=primary_id,
         shared_user_id=user.id
     ).first()
     if existing:
         flash('Access already granted', 'info')
         return redirect(url_for('main.index'))
+
     access = SharedAccess(
-        primary_user_id=primary_id,
+        owner_id=primary_id,
         shared_user_id=user.id,
-        alias_name=alias or None
+        alias=alias or user.username,
+        can_upload=True,
+        can_comment=True
     )
     db.session.add(access)
     db.session.commit()
+
     flash(f"Granted gallery access to {user.username}", 'success')
     return redirect(url_for('main.index'))
 

@@ -2,7 +2,7 @@ import os
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
-from flask_mail import Mail
+from flask_mailman import Mail  # switched from flask_mail
 
 # Initialize extensions
 db = SQLAlchemy()
@@ -21,10 +21,10 @@ def create_app():
     # Initialize extensions
     db.init_app(app)
     login_manager.init_app(app)
-    mail.init_app(app)
+    mail.init_app(app)  # this now uses Flask-Mailman under the hood
     login_manager.login_view = "auth.login"
 
-    # Import models (important for creating tables)
+    # Import models so SQLAlchemy knows about them
     from . import models
 
     # Register blueprints
