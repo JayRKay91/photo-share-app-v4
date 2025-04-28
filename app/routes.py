@@ -10,7 +10,7 @@ from werkzeug.utils import secure_filename
 from PIL import Image
 import pillow_heif
 from moviepy.video.io.VideoFileClip import VideoFileClip
-from flask_login import login_required, current_user
+from flask_login import login_required, current_user, logout_user
 from .models import db, User, SharedAccess
 
 main = Blueprint("main", __name__)
@@ -82,6 +82,14 @@ def user_folder(user_id: int) -> Path:
     path = UPLOAD_BASE / str(user_id)
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+@main.route("/logout")
+@login_required
+def logout():
+    """Log out the current user and redirect to login page."""
+    logout_user()
+    return redirect(url_for('auth.login'))
 
 
 @main.route("/")

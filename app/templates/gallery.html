@@ -10,10 +10,18 @@
   <div class="layout-wrapper">
     <header class="page-header">
       <h1>Photo Gallery</h1>
+
       <button class="btn btn-primary"
               onclick="location.href='{{ url_for('main.upload') }}'">
         ➕ Upload New Photo
       </button>
+
+      {% if current_user.is_authenticated %}
+        <a href="{{ url_for('main.logout') }}"
+           class="btn btn-secondary ms-2">
+          Logout
+        </a>
+      {% endif %}
     </header>
 
     <section class="controls sticky-search">
