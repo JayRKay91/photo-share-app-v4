@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import login_user, login_required, logout_user, current_user
 from itsdangerous import URLSafeTimedSerializer
-from flask_mail import Message
+from flask_mailman import EmailMessage  # switched from flask_mail
 from .models import db, User
 from . import login_manager, mail
 import os
@@ -51,8 +51,12 @@ def register():
         # Send verification email
         token = s.dumps(email, salt="email-confirm")
         link = url_for("auth.verify_email", token=token, _external=True)
-        msg = Message("Confirm Your Email", recipients=[email])
-        msg.body = f"Click the link to verify your account: {link}"
+        msg = EmailMessage(
+            subject="Confirm Your Email",
+            body=f"Click the link to verify your account: {link}",
+            from_email=current_app.config['MAIL_DEFAULT_SENDER'],
+            to=[email]
+        )
         mail.send(msg)
 
         flash("A verification email has been sent. Please check your inbox.", "success")
@@ -116,8 +120,12 @@ def reset_request():
         if user:
             token = s.dumps(email, salt="password-reset")
             link = url_for("auth.reset_token", token=token, _external=True)
-            msg = Message("Reset Your Password", recipients=[email])
-            msg.body = f"Click to reset your password: {link}"
+            msg = EmailMessage(
+                subject="Reset Your Password",
+                body=f"Click to reset your password: {link}",
+                from_email=current_app.config['MAIL_DEFAULT_SENDER'],
+                to=[email]
+            )
             mail.send(msg)
             flash("Password reset email sent.", "success")
         else:

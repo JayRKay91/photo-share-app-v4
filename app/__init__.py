@@ -2,12 +2,18 @@ import os
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
-from flask_mailman import Mail  # switched from flask_mail
+from flask_mailman import Mail
+from flask_migrate import Migrate
+from dotenv import load_dotenv
+
+# Load environment variables from .env
+load_dotenv()
 
 # Initialize extensions
 db = SQLAlchemy()
 login_manager = LoginManager()
 mail = Mail()
+migrate = Migrate()
 
 def create_app():
     app = Flask(__name__)
@@ -20,6 +26,7 @@ def create_app():
 
     # Initialize extensions
     db.init_app(app)
+    migrate.init_app(app, db)
     login_manager.init_app(app)
     mail.init_app(app)  # this now uses Flask-Mailman under the hood
     login_manager.login_view = "auth.login"
@@ -34,6 +41,7 @@ def create_app():
     app.register_blueprint(auth_blueprint)
 
     return app
+
 
 def create_upload_folder(upload_folder):
     """Creates the uploads folder if it doesn't exist."""

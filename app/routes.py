@@ -87,7 +87,8 @@ def user_folder(user_id: int) -> Path:
 @main.route("/")
 @login_required
 def index():
-    """Gallery view: shows only current user's media."""
+    """Gallery view: shows current user's media plus galleries they've been shared."""
+    # Load metadata
     descs    = load_json(DESCRIPTION_PATH)
     albums   = load_json(ALBUM_PATH)
     comments = load_json(COMMENTS_PATH)
@@ -139,6 +140,11 @@ def index():
 
     all_tags = sorted({t for lst in tags.values() for t in lst}, key=str.lower)
 
+    # Shared-access entries for comment/upload form selections
+    shared_accesses = SharedAccess.query.filter_by(
+        shared_user_id=current_user.id
+    ).all()
+
     return render_template(
         "gallery.html",
         images=images,
@@ -147,18 +153,17 @@ def index():
         tags=tags,
         all_tags=all_tags,
         current_tag=tag_filter,
-        search_query=search_query
+        search_query=search_query,
+        shared_accesses=shared_accesses
     )
 
 
 @main.route("/upload", methods=["GET", "POST"])
 @login_required
 def upload():
-    """Upload handler: shared or owner uploads with alias tracking."""
+    """Upload handler: shared or owner uploads with alias tagging."""
     if request.method == "POST":
-        # Determine target owner
         owner_id = int(request.form.get("owner_id", current_user.id))
-        # Permission check & alias
         if owner_id != current_user.id:
             access = SharedAccess.query.filter_by(
                 owner_id=owner_id,
@@ -210,14 +215,14 @@ def upload():
                     except Exception as e:
                         flash(f"Thumbnail failed for {filename}: {e}", 'error')
 
-                # Metadata keys
+                # Metadata initialization
                 if album:
                     albums[filename] = album
                 descs.setdefault(filename, "")
                 comments.setdefault(filename, [])
                 tags.setdefault(filename, [])
 
-                # Mark upload in comments
+                # Mark upload
                 comments[filename].insert(0, f"Uploaded by {uploader_alias}")
 
         save_json(DESCRIPTION_PATH, descs)
@@ -228,6 +233,7 @@ def upload():
         flash('Upload successful.', 'success')
         return redirect(url_for('main.index'))
 
+    # GET
     return render_template('upload.html')
 
 
@@ -371,7 +377,6 @@ def add_comment(filename):
         flash("Empty comment not added.", 'warning')
         return redirect(url_for('main.index'))
 
-    # Determine target owner
     owner_id = int(request.form.get("owner_id", current_user.id))
     if owner_id != current_user.id:
         access = SharedAccess.query.filter_by(
